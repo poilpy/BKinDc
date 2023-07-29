@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import os
 
 from .resnet_updated import conv3x3
 from .resnet_updated import resnetbank50all as resnetbank50
@@ -160,6 +161,8 @@ class Model(nn.Module):
         heatmap = kpt_out[-1].view(-1, self.K, kpt_out[-1].size(2) * kpt_out[-1].size(3))
         heatmap = self.ch_softmax(heatmap)
         heatmap = heatmap.view(-1, self.K, kpt_out[-1].size(2), kpt_out[-1].size(3))
+
+        
                 
         u_x, u_y, covs = self._mapTokpt(heatmap)   
         
@@ -228,6 +231,8 @@ class Model(nn.Module):
              tr_confidence)
         
         
+
+
         return recon, (tr_u_x, tr_u_y), tr_kpt_conds[-1], tr_kpt_out[-1], (u_x, u_y), tr_confidence
     
         

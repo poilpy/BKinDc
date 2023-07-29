@@ -47,6 +47,8 @@ def create_parser():
                         help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--nkpts', default=10, type=int, metavar='N',
                         help='number of keypoints')
+    parser.add_argument('--num_agents', default=2, type=int, metavar='N',
+                        help='number of agents')
     parser.add_argument('--schedule', default=30, type=int, metavar='N',
                         help='learning rate scheduler')
     parser.add_argument('--image-size', default=128, type=int, metavar='N',

@@ -12,7 +12,7 @@ import cv2
 __all__ = ['show_heatmaps', 'show_img_with_heatmap', 'visualize_with_circles', 'save_images']
 
 
-def save_images(image, output, epoch, args, curr_epoch):
+def save_images(image, output, epoch, args, curr_epoch, di):
     mean=[0.485, 0.456, 0.406]
     _mean = np.asarray(mean).reshape((3,1,1))
     std=[0.229, 0.224, 0.225]
@@ -25,13 +25,16 @@ def save_images(image, output, epoch, args, curr_epoch):
         os.makedirs(im_dir)
         
     sample_ids = np.random.permutation(len(output[0]))
+    # sample_ids = len(output[0])
     sample_ids = sample_ids[:min(5, len(output[0]))]
     
     im = image.data.cpu().numpy()
     
     kps = output[1]
     recon = output[0]
-    if epoch < args.curriculum:
+    rawheat = output[3]
+    
+    if epoch < args.curriculum: 
         heatmap = output[2]
         confidence = output[5]
     else:
@@ -47,20 +50,31 @@ def save_images(image, output, epoch, args, curr_epoch):
                                              mean=mean, std=std)
         im_with_pts = im_with_pts.astype('uint8')
         im_with_pts = cv2.cvtColor(im_with_pts, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(os.path.join(im_dir, 'image_'+str(i)+'.png'), im_with_pts)
+        cv2.imwrite(os.path.join(im_dir, 'image_'+str(i)+ str(di)+'.png'), im_with_pts)
 
         # Heatmap
         heatmaps = show_heatmaps(heatmap[ix])
         heatmaps = (heatmaps.data.cpu().numpy() * 255).astype('uint8')
         heatmaps = heatmaps.transpose((1,2,0))
-        cv2.imwrite(os.path.join(im_dir, 'heatmaps_'+str(i)+'.png'), heatmaps)
+        cv2.imwrite(os.path.join(im_dir, 'heatmaps_'+str(i)+ str(di)+'.png'), heatmaps)
 
         # Reconstruction
         recon_im = recon[ix].data.cpu().numpy()
         recon_im = (recon_im * _std + _mean) * 255
         recon_im = recon_im.astype('uint8')
         recon_im = recon_im.transpose((1,2,0))
-        cv2.imwrite(os.path.join(im_dir, 'recon_'+str(i)+'.png'), recon_im)
+        cv2.imwrite(os.path.join(im_dir, 'recon_'+str(i)+ str(di)+'.png'), recon_im)
+        
+        # raw heatmaps
+        x = rawheat[ix][0].detach().cpu().numpy()
+        if(epoch >= args.curriculum):
+            x = x[0]
+        plt.imsave(os.path.join(im_dir, 'raw_'+str(i)+ str(di)+'.png'), x)
+        # x = rawheat[ix][0].detach().cpu().numpy()
+        x = cv2.convertScaleAbs(x, alpha=(255.0))
+        cv2.imwrite(os.path.join(im_dir, 'rawB_'+str(i)+ str(di)+'.png'), x)
+
+
     
 
 # functions to show an image

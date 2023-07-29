@@ -11,12 +11,17 @@ from config.config_reader import parse_args, create_parser
 
 from dataloader.load_dataloader import load_dataloader
 
-from model.unsupervised_model import Model
+from model.unsupervised_model_multi_agents import Model
+# from model.tusk import Model
 
 from loss.compute_loss import *
 
 from utils import Logger, mkdir_p, save_images
 from utils.model_utils import *
+
+import matplotlib.pyplot as plt
+plt.ioff()
+
 
 
 best_loss = 10000
@@ -30,8 +35,7 @@ def main():
                       'disable data parallelism.')
 
     ngpus_per_node = torch.cuda.device_count()
-    # main_worker(args.gpu, ngpus_per_node, args)
-    main_worker(0, 0, args)
+    main_worker(args.gpu, ngpus_per_node, args)
 
 def main_worker(gpu, ngpus_per_node, args):
     global best_loss
@@ -40,9 +44,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
-    # create model 
+    # create model
     output_shape = (int(args.image_size/4), int(args.image_size/4))
-    model = Model(args.nkpts, output_shape=output_shape)
+    model = Model(args.nkpts, output_shape=output_shape, num_agents=args.num_agents)
 
     if args.gpu is not None:
         torch.cuda.set_device(args.gpu)
@@ -50,7 +54,7 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         model = torch.nn.DataParallel(model).cuda()
 
-    loss_module = computeLoss(args) 
+    loss_module = computeLoss(args)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -106,11 +110,19 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     is_best = True
+
+    
+    
+    rloss = []
+
     for epoch in range(args.start_epoch, args.epochs):
+
+        running_loss = 0.0
+
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train_loss = train(train_loader, model, loss_module, optimizer, epoch, args)
+        train_loss, running_loss, rloss = train(train_loader, model, loss_module, optimizer, epoch, args, running_loss, rloss)
 
         # evaluate on validation set every val_schedule epochs
         if epoch > 0 and epoch%args.val_schedule == 0:
@@ -131,8 +143,12 @@ def main_worker(gpu, ngpus_per_node, args):
             'optimizer' : optimizer.state_dict(),
         }, is_best, checkpoint=args.checkpoint)
 
+        saveLoss(args, rloss, epoch)
+
         
-def train(train_loader, model, loss_module, optimizer, epoch, args):
+def train(train_loader, model, loss_module, optimizer, epoch, args, running_loss, rloss):
+
+    epoch=epoch+1
 
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -148,6 +164,8 @@ def train(train_loader, model, loss_module, optimizer, epoch, args):
     end = time.time()
 
     for i, images in enumerate(train_loader):
+        # if(i>=200):
+        #     break
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -166,9 +184,9 @@ def train(train_loader, model, loss_module, optimizer, epoch, args):
         else:
             output = model(inputs, tr_inputs, gmtr_x1 = rot_im1, gmtr_x2 = rot_im2, gmtr_x3 = rot_im3)
 
-        # print(dir(output))
-
         loss = loss_module.update_loss(inputs, tr_inputs, loss_mask, output, epoch)
+
+        running_loss += loss.item()
         
         # measure accuracy and record loss
         losses.update(loss.item(), images[0].size(0))
@@ -185,10 +203,15 @@ def train(train_loader, model, loss_module, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
             
-        if args.visualize:
-            save_images(tr_inputs, output, epoch, args, epoch, i)
+            if args.visualize and epoch%2==0:
+                if epoch < args.curriculum:
+                    save_images(tr_inputs, output, epoch, args, epoch, i)
+                else:
+                    save_images(tr_inputs, output, epoch, args, epoch, i)
 
-    return losses.avg
+    epoch_loss = running_loss / len(train_loader)
+    rloss.append(epoch_loss)
+    return losses.avg, running_loss, rloss 
 
 def validate(val_loader, model, loss_module, epoch, args):
 
@@ -231,6 +254,19 @@ def validate(val_loader, model, loss_module, epoch, args):
                 progress.display(i)
 
     return losses.avg
+
+def saveLoss(args, loss, curr_epoch): 
+    im_dir = os.path.join(args.checkpoint, 'samples/loss')
+    
+    if not os.path.isdir(im_dir):
+        os.makedirs(im_dir)
+
+    plt.plot(loss)
+
+    plt.savefig(os.path.join(im_dir, 'loss'+'.png'))
+
+
+
 
 
 if __name__ == '__main__':

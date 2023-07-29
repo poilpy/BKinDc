@@ -59,28 +59,28 @@ class computeLoss:
 
         if epoch >= self.args.curriculum:
             deg = torch.ones((output[2][1].size()[0])).to(output[2][1].device) * 90
-            rot_loss, rot_label = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][1], deg)
+            rot_loss, rot_label = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][1][:, :self.args.nkpts], deg)
             loss += rot_loss/3
 
             deg = torch.ones((output[2][1].size()[0])).to(output[2][1].device) * 180
-            rot_loss, rot_label2 = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][2], deg)
+            rot_loss, rot_label2 = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][2][:, :self.args.nkpts], deg)
             loss += rot_loss/3
 
             deg = torch.ones((output[2][1].size()[0])).to(output[2][1].device) * -90
-            rot_loss, rot_label3 = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][3], deg)
+            rot_loss, rot_label3 = self.criterion[3](output[2][0][:, :self.args.nkpts], output[2][3][:, :self.args.nkpts], deg)
             loss += rot_loss/3
 
-            separation = self.criterion[2]((output[5][0], output[5][1]))
+            separation = self.criterion[2]((output[5][0][:, :self.args.nkpts], output[5][1][:, :self.args.nkpts]))
             loss += separation.mean()
 
-            separation = self.criterion[2]((output[5][2], output[5][3]))
+            separation = self.criterion[2]((output[5][2][:, :self.args.nkpts], output[5][3][:, :self.args.nkpts]))
             loss += separation.mean()
 
-            separation = self.criterion[2]((output[5][4], output[5][5]))
+            separation = self.criterion[2]((output[5][4][:, :self.args.nkpts], output[5][5][:, :self.args.nkpts]))
             loss += separation.mean()
 
-            separation = self.criterion[2](output[1])
-            loss += separation.mean()
+            # separation = self.criterion[2](output[1])
+            # loss += separation.mean()
 
         return loss
 

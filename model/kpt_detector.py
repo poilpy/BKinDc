@@ -4,6 +4,9 @@ import torch.nn as nn
 from .resnet_updated import resnetbank50all as resnetbank50
 from .globalNet import globalNet
 
+import os
+import cv2
+from utils.visualize import show_heatmaps
     
 class Model(nn.Module):
     def __init__(self, n_kpts=10, pretrained=True, output_shape=(64, 64)):
@@ -57,6 +60,12 @@ class Model(nn.Module):
         heatmap = self.ch_softmax(heatmap) 
         heatmap = heatmap.view(-1, self.K, kpt_out[-1].size(2), kpt_out[-1].size(3))
         
+        im_dir = os.path.join("heat")
+        heatmaps = show_heatmaps(heatmap)
+        heatmaps = (heatmaps.data.cpu().numpy() * 255).astype('uint8')
+        heatmaps = heatmaps.transpose((1,2,0))
+        cv2.imwrite(os.path.join(im_dir, 'heatmapsN_'+str(1)+'.png'), heatmaps)
+
         confidence = heatmap.max(dim=-1)[0].max(dim=-1)[0]
             
         u_x, u_y, covs = self._mapTokpt(heatmap)
